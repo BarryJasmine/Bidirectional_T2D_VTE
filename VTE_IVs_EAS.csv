@@ -1,0 +1,2 @@
+CHR,POS,REF,ALT,rsid,all_meta_AF,inv_var_meta_beta,inv_var_meta_sebeta,inv_var_meta_p,inv_var_het_p,direction,N_case,N_ctrl,F_stat,N
+5,53503626,T,C,rs7703177,0.3511,0.52931,0.1135,3.106e-06,0.6464,++,193,77462,21.7484582351685,77655
