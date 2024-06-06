@@ -1,1 +1,1 @@
-# Bidirectional_T2D_VTE
+# Bidirectional MR of T2D on VTE in East Asians and African Americans
