@@ -11,32 +11,117 @@ library(SNPlocs.Hsapiens.dbSNP144.GRCh38)
 library(BSgenome.Hsapiens.1000genomes.hs37d5)
 library(BSgenome.Hsapiens.NCBI.GRCh38)
 
-### multi-biobank East Asian GWAS of T2D (PMID:36778051)
-### download the dataset: https://www.globalbiobankmeta.org/resources , click on the 'Google Sheets' hyperlink in the website
+### East Asian (EAS) and African American (AFA) GWAS of T2D (PMID:38374256)
+### Download original EAS and AFA T2D GWAS data from the website https://diagram-consortium.org/downloads.html
 
-### read GWAS of T2D
-T2D <- read.table(gzfile("T2D_Bothsex_eas_inv_var_meta_GBMI_052021_nbbkgt1.txt.gz"), sep='\t', header = F)
-T2D <- T2D[,-c(14:17)]
-colnames(T2D) <- c('CHR', 'POS', 'REF', 'ALT', 'rsid', 'all_meta_AF', 'inv_var_meta_beta', 'inv_var_meta_sebeta',
-              'inv_var_meta_p', 'inv_var_het_p', 'direction', 'N_case', 'N_ctrl')
-### selection of instrumental variables ###
-T2D <- T2D[T2D$inv_var_meta_p<5e-8, ]
+### format EAS T2D data using MungeSumstats
+### we aimed to add the rsid to EAS T2D summary-level data
 
+T2D <- read.table('F:/diabetes_VTE/EAS_Metal_LDSC-CORR_Neff.v2.txt', sep='\t', header = T, stringsAsFactors = F)
+T2D$N <- T2D$Ncases + T2D$Ncontrols
+T2D <- T2D[,-c(9:11)]
+colnames(T2D) <- c('CHR', 'POS', 'Effect_allele', 'Other_allele', 'Beta', 'SE', 'EAF',
+         'P_value', 'N')
+format_sumstats(path = T2D, ref_genome = "GRCh37", dbSNP=144, save_path = "F:/diabetes_VTE/T2D.EAS.tsv.gz")
+
+### format AFA T2D data using MungeSumstats
+### we aimed to add the rsid to AFA T2D summary-level data
+
+T2D <- read.table('F:/diabetes_VTE/AFA_Metal_LDSC-CORR_Neff.v2.txt', sep='\t', header = T, stringsAsFactors = F)
+T2D$N <- T2D$Ncases + T2D$Ncontrols
+T2D <- T2D[,-c(9:11)]
+colnames(T2D) <- c('CHR', 'POS', 'Effect_allele', 'Other_allele', 'Beta', 'SE', 'EAF',
+         'P_value', 'N')
+format_sumstats(path = T2D, ref_genome = "GRCh37", dbSNP=144, save_path = "F:/diabetes_VTE/T2D.AFA.tsv.gz")
+
+#### select instrumental variables for T2D in EAS and AFA ####
+
+### EAS ###
+T2D <- read.table('F:/diabetes_VTE/T2D.EAS.tsv.gz', sep = '\t', stringsAsFactors = F, header = T)
+### genome-wide significant snps
+T2D <- T2D[T2D$P<5e-8, ]
 ### clumping ###
-dat <- data.frame(rsid=T2D$rsid, pval=T2D$inv_var_meta_p)
+dat <- data.frame(rsid=T2D$SNP, pval=T2D$P)
 retained_snps <- ld_clump(dat, clump_kb = 10000, clump_r2 = 0.001, bfile = 'D:/LD_reference/EAS',
                           plink_bin = 'D:/LD_reference/plink.exe')
-T2D <- T2D[T2D$rsid%in%retained_snps$rsid, ]
+T2D <- T2D[T2D$SNP%in%retained_snps$rsid, ]
+### Exclude SNPs with minor allele frequency <0.01 ###
+T2D <- T2D[(T2D$FRQ>0.01)&(T2D$FRQ<0.99), ]
+### Estimate the F-statistics (PMID:30861319)
+### Exclude SNPs with F-statistics<10
+T2D$F_stat <- (T2D$BETA/T2D$SE)^2
+T2D <- T2D[T2D$F_stat>10, ]
+
+write.csv(T2D, 'F:/diabetes_VTE/T2D_IVs_EA.csv', quote = F, row.names = F)
+
+### AFA ###
+T2D <- read.table('F:/diabetes_VTE/T2D.AFA.tsv.gz', sep = '\t', stringsAsFactors = F, header = T)
+
+### genome-wide significant snps
+T2D <- T2D[T2D$P<5e-8, ]
+
+### clumping ###
+dat <- data.frame(rsid=T2D$SNP, pval=T2D$P)
+retained_snps <- ld_clump(dat, clump_kb = 10000, clump_r2 = 0.001, bfile = 'D:/LD_reference/AFR',
+                          plink_bin = 'D:/LD_reference/plink.exe')
+T2D <- T2D[T2D$SNP%in%retained_snps$rsid, ]
 
 ### Exclude SNPs with minor allele frequency <0.01 ###
-T2D <- T2D[(T2D$all_meta_AF>0.01)&(T2D$all_meta_AF<0.99), ]
+T2D <- T2D[(T2D$FRQ>0.01)&(T2D$FRQ<0.99), ]
 
 ### Estimate the F-statistics (PMID:30861319)
 ### Exclude SNPs with F-statistics<10
-T2D$F_stat <- (T2D$inv_var_meta_beta/T2D$inv_var_meta_sebeta)^2
+T2D$F_stat <- (T2D$BETA/T2D$SE)^2
 T2D <- T2D[T2D$F_stat>10, ]
 
-write.csv(T2D, 'T2D_IVs_multiple_biobank.csv', quote = F, row.names = F)
+write.csv(T2D, 'F:/diabetes_VTE/T2D_IVs_AFA.csv', quote = F, row.names = F)
+
+
+### East Asian (EAS) and African American (AFA) GWAS of VTE (PMID:36777996)
+### Download original EAS and AFA VTE GWAS data from the website https://www.globalbiobankmeta.org/sharable-links
+
+#### select instrumental variables for VTE in EAS and AFA ####
+
+### EAS
+VTE <- read.table(gzfile('F:/diabetes_VTE/VTE_Bothsex_eas_inv_var_meta_GBMI_052021_nbbkgt1.txt.gz'), sep='\t', header=F,
+                  stringsAsFactors = F)
+VTE <- VTE[,-c(14:17)]
+colnames(VTE) <- c('CHR', 'POS', 'REF', 'ALT', 'rsid', 'all_meta_AF', 'inv_var_meta_beta', 
+                   'inv_var_meta_sebeta', 'inv_var_meta_p', 'inv_var_het_p', 'direction', 'N_case', 'N_ctrl')
+### genome-wide significant snps
+VTE <- VTE[VTE$inv_var_meta_p<5e-6, ]
+### only one snp, we do not need to clump ###
+### Exclude SNPs with minor allele frequency <0.01 ###
+VTE <- VTE[(VTE$all_meta_AF>0.01)&(VTE$all_meta_AF<0.99), ]
+### Estimate the F-statistics (PMID:30861319)
+### Exclude SNPs with F-statistics<10
+VTE$F_stat <- (VTE$inv_var_meta_beta/VTE$inv_var_meta_sebeta)^2
+VTE <- VTE[VTE$F_stat>10, ]
+
+write.csv(VTE, 'F:/diabetes_VTE/VTE_IVs_EAS.csv', quote = F, row.names = F)
+
+### AFA
+VTE <- read.table(gzfile('F:/diabetes_VTE/VTE_Bothsex_afr_inv_var_meta_GBMI_052021_nbbkgt1.txt.gz'), sep='\t', header=F,
+                  stringsAsFactors = F)
+VTE <- VTE[,-c(14:17)]
+colnames(VTE) <- c('CHR', 'POS', 'REF', 'ALT', 'rsid', 'all_meta_AF', 'inv_var_meta_beta', 
+                   'inv_var_meta_sebeta', 'inv_var_meta_p', 'inv_var_het_p', 'direction', 'N_case', 'N_ctrl')
+### genome-wide significant snps
+VTE <- VTE[VTE$inv_var_meta_p<5e-6, ]
+### clumping ###
+dat <- data.frame(rsid=VTE$SNP, pval=VTE$P)
+retained_snps <- ld_clump(dat, clump_kb = 10000, clump_r2 = 0.001, bfile = 'D:/LD_reference/AFR',
+                          plink_bin = 'D:/LD_reference/plink.exe')
+VTE <- VTE[VTE$SNP%in%retained_snps$rsid, ]
+### Exclude SNPs with minor allele frequency <0.01 ###
+VTE <- VTE[(VTE$all_meta_AF>0.01)&(VTE$all_meta_AF<0.99), ]
+### Estimate the F-statistics (PMID:30861319)
+### Exclude SNPs with F-statistics<10
+VTE$F_stat <- (VTE$inv_var_meta_beta/VTE$inv_var_meta_sebeta)^2
+VTE <- VTE[VTE$F_stat>10, ]
+
+write.csv(VTE, 'F:/diabetes_VTE/VTE_IVs_AFA.csv', quote = F, row.names = F)
+
 
 
 #### East Asian T2D ---> VTE ####
@@ -59,10 +144,12 @@ write.csv(T2D.VTE.EAS, 'F:/diabetes_VTE/T2D_to_VTE_EA.csv', quote=F, row.names =
 T2D.VTE.EA <- read.csv('F:/diabetes_VTE/T2D_to_VTE_EA.csv', sep=',', stringsAsFactors = F, header = T)
 ivw_res.VTE.EA <- mr(T2D.VTE.EA, method_list = c('mr_ivw', 'mr_egger_regression', 'mr_weighted_median'));ivw_res.VTE.EA
 #### To better interpret the result, we multiplied the causal estimate by 0.693 to reflect 
-#### the increase in the risk of CHD associated with each doubling of the odds of genetic predisposition to T2D
+#### the increase in the risk of VTE associated with each doubling of the odds of genetic predisposition to T2D
 ivw_res.VTE.EA$b <- 0.693*ivw_res.VTE.EA$b
 ivw_res.VTE.EA$se <- 0.693*ivw_res.VTE.EA$se
 generate_odds_ratios(ivw_res.VTE.EA)
+
+
 
 #### East Asian VTE ---> T2D ####
 VTE <- read.csv('F:/diabetes_VTE/VTE_IVs_EAS.csv', sep=',', stringsAsFactors = F, header = T)
